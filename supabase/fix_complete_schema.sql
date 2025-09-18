@@ -1,0 +1,225 @@
+-- Complete schema fix for multiplayer bingo game
+-- Run this in Supabase SQL Editor
+
+-- Drop existing tables if they exist (in correct order)
+DROP TABLE IF EXISTS called_numbers CASCADE;
+DROP TABLE IF EXISTS player_cards CASCADE;
+DROP TABLE IF EXISTS players CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
+DROP TABLE IF EXISTS bingo_cards CASCADE;
+DROP TABLE IF EXISTS bingo_patterns CASCADE;
+DROP TABLE IF EXISTS game_rules CASCADE;
+DROP TABLE IF EXISTS admin_users CASCADE;
+
+-- Create admin_users table
+CREATE TABLE admin_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create games table
+CREATE TABLE games (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID REFERENCES admin_users(id),
+  status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'active', 'paused', 'finished')),
+  started_at TIMESTAMP WITH TIME ZONE,
+  finished_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create bingo_cards table
+CREATE TABLE bingo_cards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  card_number INTEGER UNIQUE NOT NULL CHECK (card_number >= 1 AND card_number <= 100),
+  b_column INTEGER[] NOT NULL,
+  i_column INTEGER[] NOT NULL,
+  n_column INTEGER[] NOT NULL,
+  g_column INTEGER[] NOT NULL,
+  o_column INTEGER[] NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create players table
+CREATE TABLE players (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+  player_name VARCHAR(100) NOT NULL,
+  selected_card_number INTEGER REFERENCES bingo_cards(card_number),
+  is_winner BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create called_numbers table
+CREATE TABLE called_numbers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+  number INTEGER NOT NULL CHECK (number >= 1 AND number <= 75),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create bingo_patterns table
+CREATE TABLE bingo_patterns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) UNIQUE NOT NULL,
+  pattern JSONB NOT NULL,
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create game_rules table
+CREATE TABLE game_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rule_name VARCHAR(50) UNIQUE NOT NULL,
+  rule_value JSONB NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create player_cards table
+CREATE TABLE player_cards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
+  card_number INTEGER NOT NULL,
+  card_data JSONB NOT NULL,
+  marked_positions JSONB DEFAULT '[]',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default admin user
+INSERT INTO admin_users (username, password_hash) VALUES
+('admin', '$2b$10$rQZ8kHp0rQZ8kHp0rQZ8kOQZ8kHp0rQZ8kHp0rQZ8kHp0rQZ8kHp0r')
+ON CONFLICT (username) DO NOTHING;
+
+-- Insert default bingo patterns
+INSERT INTO bingo_patterns (name, pattern, description) VALUES
+('Full House', '[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]', 'All 25 numbers'),
+('Four Corners', '[0,4,20,24]', 'Four corner positions'),
+('Top Row', '[0,1,2,3,4]', 'Complete top row'),
+('Middle Row', '[10,11,12,13,14]', 'Complete middle row'),
+('Bottom Row', '[20,21,22,23,24]', 'Complete bottom row'),
+('Left Column', '[0,5,10,15,20]', 'Complete left column'),
+('Right Column', '[4,9,14,19,24]', 'Complete right column'),
+('Diagonal', '[0,6,12,18,24]', 'Top-left to bottom-right diagonal'),
+('Anti-Diagonal', '[4,8,12,16,20]', 'Top-right to bottom-left diagonal'),
+('X Pattern', '[0,6,12,18,24,4,8,16,20]', 'Both diagonals forming X')
+ON CONFLICT (name) DO NOTHING;
+
+-- Insert default game rules
+INSERT INTO game_rules (rule_name, rule_value, description) VALUES
+('winning_patterns', '["Full House", "Four Corners", "Top Row", "Middle Row", "Bottom Row"]', 'Active winning patterns'),
+('auto_call_interval', '3', 'Seconds between auto calls'),
+('max_players', '100', 'Maximum players per game'),
+('entry_fee', '20', 'Entry fee per player'),
+('free_space_enabled', 'true', 'Center space is free')
+ON CONFLICT (rule_name) DO NOTHING;
+
+-- Create bingo card generation function
+CREATE OR REPLACE FUNCTION generate_truly_random_bingo_card(card_num INTEGER)
+RETURNS VOID AS $$
+DECLARE
+  b_nums INTEGER[];
+  i_nums INTEGER[];
+  n_nums INTEGER[];
+  g_nums INTEGER[];
+  o_nums INTEGER[];
+  temp_array INTEGER[];
+  i INTEGER;
+  j INTEGER;
+  temp INTEGER;
+BEGIN
+  -- Generate B column (1-15)
+  SELECT ARRAY(SELECT generate_series(1, 15)) INTO temp_array;
+  FOR i IN 1..15 LOOP
+    j := floor(random() * (16 - i) + i)::INTEGER;
+    temp := temp_array[i];
+    temp_array[i] := temp_array[j];
+    temp_array[j] := temp;
+  END LOOP;
+  b_nums := temp_array[1:5];
+  
+  -- Generate I column (16-30)
+  SELECT ARRAY(SELECT generate_series(16, 30)) INTO temp_array;
+  FOR i IN 1..15 LOOP
+    j := floor(random() * (16 - i) + i)::INTEGER;
+    temp := temp_array[i];
+    temp_array[i] := temp_array[j];
+    temp_array[j] := temp;
+  END LOOP;
+  i_nums := temp_array[1:5];
+  
+  -- Generate N column (31-45) - only 4 numbers
+  SELECT ARRAY(SELECT generate_series(31, 45)) INTO temp_array;
+  FOR i IN 1..15 LOOP
+    j := floor(random() * (16 - i) + i)::INTEGER;
+    temp := temp_array[i];
+    temp_array[i] := temp_array[j];
+    temp_array[j] := temp;
+  END LOOP;
+  n_nums := temp_array[1:4];
+  
+  -- Generate G column (46-60)
+  SELECT ARRAY(SELECT generate_series(46, 60)) INTO temp_array;
+  FOR i IN 1..15 LOOP
+    j := floor(random() * (16 - i) + i)::INTEGER;
+    temp := temp_array[i];
+    temp_array[i] := temp_array[j];
+    temp_array[j] := temp;
+  END LOOP;
+  g_nums := temp_array[1:5];
+  
+  -- Generate O column (61-75)
+  SELECT ARRAY(SELECT generate_series(61, 75)) INTO temp_array;
+  FOR i IN 1..15 LOOP
+    j := floor(random() * (16 - i) + i)::INTEGER;
+    temp := temp_array[i];
+    temp_array[i] := temp_array[j];
+    temp_array[j] := temp;
+  END LOOP;
+  o_nums := temp_array[1:5];
+  
+  -- Insert the card
+  INSERT INTO bingo_cards (card_number, b_column, i_column, n_column, g_column, o_column)
+  VALUES (card_num, b_nums, i_nums, n_nums, g_nums, o_nums)
+  ON CONFLICT (card_number) DO UPDATE SET
+    b_column = EXCLUDED.b_column,
+    i_column = EXCLUDED.i_column,
+    n_column = EXCLUDED.n_column,
+    g_column = EXCLUDED.g_column,
+    o_column = EXCLUDED.o_column;
+END;
+$$ LANGUAGE plpgsql;
+
+-- DO NOT generate random cards - use existing printed cards instead
+-- Run extract-printed-cards.py to get exact card data
+-- Then use supabase/insert_printed_cards.sql
+
+-- Enable RLS on all tables
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bingo_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE called_numbers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bingo_patterns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE player_cards ENABLE ROW LEVEL SECURITY;
+
+-- Create policies (allow all for now - adjust as needed)
+CREATE POLICY "Allow all on admin_users" ON admin_users FOR ALL USING (true);
+CREATE POLICY "Allow all on games" ON games FOR ALL USING (true);
+CREATE POLICY "Allow all on bingo_cards" ON bingo_cards FOR ALL USING (true);
+CREATE POLICY "Allow all on players" ON players FOR ALL USING (true);
+CREATE POLICY "Allow all on called_numbers" ON called_numbers FOR ALL USING (true);
+CREATE POLICY "Allow all on bingo_patterns" ON bingo_patterns FOR ALL USING (true);
+CREATE POLICY "Allow all on game_rules" ON game_rules FOR ALL USING (true);
+CREATE POLICY "Allow all on player_cards" ON player_cards FOR ALL USING (true);
+
+-- Enable realtime for all tables
+ALTER PUBLICATION supabase_realtime ADD TABLE games;
+ALTER PUBLICATION supabase_realtime ADD TABLE players;
+ALTER PUBLICATION supabase_realtime ADD TABLE called_numbers;
+ALTER PUBLICATION supabase_realtime ADD TABLE bingo_patterns;
+ALTER PUBLICATION supabase_realtime ADD TABLE game_rules;
+ALTER PUBLICATION supabase_realtime ADD TABLE player_cards;

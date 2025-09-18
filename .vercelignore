@@ -1,0 +1,11 @@
+node_modules
+.next
+.env.local
+*.log
+.DS_Store
+supabase
+printable_cards
+Asset
+*.py
+*.md
+*.sql

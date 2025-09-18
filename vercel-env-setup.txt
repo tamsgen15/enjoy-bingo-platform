@@ -1,0 +1,16 @@
+# Vercel Environment Variables Setup
+# Copy these to your Vercel project dashboard under Settings > Environment Variables
+
+# Production Environment Variables:
+NEXT_PUBLIC_SUPABASE_URL=https://gvfcbzzindikkmhaahak.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2ZmNienppbmRpa2ttaGFhaGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0NjU5MzYsImV4cCI6MjA3MjA0MTkzNn0.9Pc-juJB8PqZkznfjQOERM27Gpap-wvIiG7aLkEFkMc
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2ZmNienppbmRpa2ttaGFhaGFrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjQ2NTkzNiwiZXhwIjoyMDcyMDQxOTM2fQ.placeholder_service_key
+
+# Instructions:
+# 1. Go to vercel.com/dashboard
+# 2. Select your project
+# 3. Go to Settings > Environment Variables
+# 4. Add each variable above (name and value)
+# 5. Set Environment to "Production, Preview, Development"
+# 6. Click "Save"
+# 7. Redeploy your project

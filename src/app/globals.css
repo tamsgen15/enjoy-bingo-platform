@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  body {
+    @apply bg-gradient-to-br from-blue-900 to-purple-900 min-h-screen;
+  }
+}
+
+@layer components {
+  .bingo-card {
+    @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl;
+  }
+  
+  .bingo-button {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:from-blue-600 hover:to-purple-700 shadow-lg;
+  }
+  
+  .bingo-button-secondary {
+    @apply bg-white/10 backdrop-blur-sm text-white font-semibold py-3 px-6 rounded-xl border border-white/30 transition-all duration-200 hover:bg-white/20;
+  }
+  
+  .bingo-button-danger {
+    @apply bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:from-red-600 hover:to-red-700 shadow-lg;
+  }
+  
+  .bingo-input {
+    @apply bg-white/10 backdrop-blur-sm border border-white/30 rounded-xl px-4 py-3 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  
+  .number-board-header {
+    @apply bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-black text-lg w-12 h-12 flex items-center justify-center rounded-lg shadow-lg;
+  }
+  
+  .number-cell {
+    @apply w-6 h-6 sm:w-10 sm:h-10 flex items-center justify-center text-xs sm:text-sm font-bold rounded-lg transition-all duration-300 cursor-pointer;
+  }
+  
+  .number-cell.pending {
+    @apply bg-white/20 text-white/70 border border-white/30 hover:bg-white/30;
+  }
+  
+  .number-cell.called {
+    @apply bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg transform scale-105;
+  }
+  
+  .number-cell.current {
+    @apply bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-2xl animate-pulse transform scale-110;
+  }
+  
+  .stats-card {
+    @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-xl;
+  }
+  
+  .player-card {
+    @apply bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 hover:bg-white/15 transition-all duration-200;
+  }
+  
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50;
+  }
+  
+  .modal-content {
+    @apply bg-white/20 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30;
+  }
+  
+  .game-card {
+    @apply grid grid-cols-5 gap-1 p-4 bg-white rounded-lg shadow-lg max-w-md mx-auto;
+  }
+  
+  .game-cell {
+    @apply w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center text-xs sm:text-sm font-bold border-2 border-gray-300 bg-white cursor-pointer transition-all duration-200 hover:bg-gray-50;
+  }
+  
+  .game-cell.marked {
+    @apply bg-blue-500 text-white border-blue-600;
+  }
+  
+  .game-cell.free {
+    @apply bg-gray-200 text-gray-600 text-xs cursor-default;
+  }
+}
