@@ -3,15 +3,23 @@ import { supabase } from '@/lib/supabase'
 
 export async function GET() {
   try {
-    // Get games data
-    const { data: games } = await supabase
+    // Get games data with error handling
+    const { data: games, error: gamesError } = await supabase
       .from('games')
       .select('*')
 
-    // Get players data
-    const { data: players } = await supabase
+    if (gamesError) {
+      console.error('Games query error:', gamesError)
+    }
+
+    // Get players data with error handling
+    const { data: players, error: playersError } = await supabase
       .from('players')
       .select('*')
+
+    if (playersError) {
+      console.error('Players query error:', playersError)
+    }
 
     // Calculate today's data
     const today = new Date().toISOString().split('T')[0]

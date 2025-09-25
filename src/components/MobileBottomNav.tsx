@@ -44,7 +44,7 @@ export default function MobileBottomNav({ activeTab, onTabChange, userRole }: Mo
                 : 'text-white/60 hover:text-white/80'
             }`}
           >
-            <tab.icon className="h-5 w-5 mb-1" />
+            <tab.icon className="h-5 w-5 mb-1" {...({} as any)} />
             <span className="text-xs font-medium">{tab.label}</span>
           </button>
         ))}

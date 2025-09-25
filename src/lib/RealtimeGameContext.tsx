@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
-import { OfflineAmharicTTS } from '@/lib/OfflineAmharicTTS'
+import { automaticNumberCaller } from '@/lib/AutomaticNumberCaller'
+import { WinningVerificationService } from '@/lib/winningVerificationService'
 
 interface GameState {
   currentGame: any
@@ -39,8 +40,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined)
 
 export function RealtimeGameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GameState>(initialState)
-  const [autoCallInterval, setAutoCallInterval] = useState<NodeJS.Timeout | null>(null)
-  const [voiceTTS] = useState(() => new OfflineAmharicTTS())
+
 
   // Real-time subscriptions
   useEffect(() => {
@@ -98,45 +98,19 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
     }
   }, [state.currentGame?.id])
 
-  // Auto number calling
+  // Monitor game status for automatic calling
   useEffect(() => {
-    if (state.gameRunning && state.currentGame?.status === 'active' && supabase) {
-      const interval = setInterval(async () => {
-        if (state.calledNumbers.length < 75) {
-          const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-            .filter(num => !state.calledNumbers.includes(num))
-          
-          if (availableNumbers.length > 0) {
-            const nextNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)]
-            
-            try {
-              await supabase
-                .from('called_numbers')
-                .insert({
-                  game_id: state.currentGame.id,
-                  number: nextNumber
-                })
-              
-              setTimeout(() => {
-                const letter = nextNumber <= 15 ? 'B' : nextNumber <= 30 ? 'I' : nextNumber <= 45 ? 'N' : nextNumber <= 60 ? 'G' : 'O'
-                voiceTTS.speak(`${letter} ${nextNumber}`)
-              }, 1000)
-            } catch (error) {
-              console.error('Failed to call number:', error)
-            }
-          }
-        }
-      }, 5000)
-      
-      setAutoCallInterval(interval)
-      return () => clearInterval(interval)
-    } else {
-      if (autoCallInterval) {
-        clearInterval(autoCallInterval)
-        setAutoCallInterval(null)
+    if (state.currentGame?.status === 'active' && state.currentGame.id) {
+      if (!automaticNumberCaller.isGameActive() || automaticNumberCaller.getCurrentGameId() !== state.currentGame.id) {
+        console.log('🎯 RealtimeContext: Starting automatic caller for game:', state.currentGame.id)
+        automaticNumberCaller.startGame(state.currentGame.id)
       }
+    } else if (state.currentGame?.status === 'paused') {
+      automaticNumberCaller.pauseGame()
+    } else if (state.currentGame?.status === 'finished' || !state.currentGame) {
+      automaticNumberCaller.stopGame()
     }
-  }, [state.gameRunning, state.currentGame?.status, state.calledNumbers.length])
+  }, [state.currentGame?.status, state.currentGame?.id])
 
   const createGame = async (ruleId?: string) => {
     if (!supabase) {
@@ -191,12 +165,7 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error
 
-      // Immediately start number calling
       setState(prev => ({ ...prev, gameRunning: true }))
-      
-      setTimeout(() => {
-        voiceTTS.speak("Game Started")
-      }, 500)
     } catch (error) {
       setState(prev => ({ ...prev, error: (error as Error).message }))
     } finally {
@@ -210,7 +179,6 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
     try {
       setState(prev => ({ ...prev, loading: true }))
       
-      // Immediately stop number calling
       setState(prev => ({ ...prev, gameRunning: false }))
       
       const { error } = await supabase
@@ -242,12 +210,25 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
         .insert({
           game_id: state.currentGame.id,
           player_name: playerName,
-          selected_card_number: cardNumber
+          card_number: cardNumber
         })
         .select()
         .single()
 
       if (error) throw error
+      
+      // Initialize player's marked positions with free space
+      await supabase
+        .from('player_marked_numbers')
+        .insert({
+          game_id: state.currentGame.id,
+          player_id: player.id,
+          card_number: cardNumber,
+          marked_positions: [12] // Center position is always marked
+        })
+        .select()
+        .single()
+        
     } catch (error) {
       setState(prev => ({ ...prev, error: (error as Error).message }))
     } finally {
@@ -259,129 +240,87 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
     if (!state.currentGame || !supabase) return null
     
     try {
-      setState(prev => ({ ...prev, loading: true }))
+      setState(prev => ({ ...prev, loading: true, error: null }))
       
-      // Get player from database
-      const { data: player, error: playerFetchError } = await supabase
+      // First check if player exists in current game
+      const { data: player, error: playerError } = await supabase
         .from('players')
         .select('*')
         .eq('game_id', state.currentGame.id)
-        .eq('selected_card_number', cardNumber)
-        .single()
-
-      if (playerFetchError || !player) {
-        throw new Error('No player found with that card number')
-      }
-
-      // Get bingo card from database
-      const { data: bingoCard, error: cardError } = await supabase
-        .from('bingo_cards')
-        .select('*')
         .eq('card_number', cardNumber)
         .single()
 
-      if (cardError || !bingoCard) {
-        throw new Error('Bingo card not found')
+      if (playerError || !player) {
+        throw new Error(`Card #${cardNumber} is not registered in this game`)
       }
 
-      // Check if player has valid bingo
-      const calledSet = new Set(state.calledNumbers)
+      // Use the new winning verification service
+      const result = await WinningVerificationService.verifyWinner(state.currentGame.id, cardNumber)
       
-      // Create 5x5 grid with FREE space
-      const grid = [
-        bingoCard.b_column,
-        bingoCard.i_column,
-        [...bingoCard.n_column.slice(0, 2), 'FREE', ...bingoCard.n_column.slice(2)],
-        bingoCard.g_column,
-        bingoCard.o_column
-      ]
-      
-      // Check horizontal lines
-      for (let row = 0; row < 5; row++) {
-        const rowComplete = grid.every(col => col[row] === 'FREE' || calledSet.has(col[row]))
-        if (rowComplete) {
-          // Valid horizontal bingo found
-          break
+      if (result.isWinner && result.pattern && result.player) {
+        // Declare winner using the service
+        const success = await WinningVerificationService.declareWinner(
+          state.currentGame.id,
+          result.player.id,
+          result.pattern.name
+        )
+        
+        if (success) {
+          setState(prev => ({ 
+            ...prev, 
+            gameRunning: false,
+            currentGame: { ...prev.currentGame, status: 'finished' }
+          }))
+
+          // Stop automatic caller when game finishes
+          automaticNumberCaller.stopGame()
+          console.log('🏆 RealtimeContext: Winner found, caller stopped')
+
+          return {
+            isWinner: true,
+            name: result.player.player_name,
+            cardNumber: result.player.card_number,
+            prize: result.prize,
+            totalPot: result.totalPot,
+            platformFee: result.platformFee,
+            pattern: result.pattern,
+            markedPositions: result.markedPositions,
+            player: result.player
+          }
+        } else {
+          throw new Error('Failed to declare winner - game may already have a winner')
         }
-      }
-      
-      // Check vertical lines
-      let hasVertical = false
-      for (let col = 0; col < 5; col++) {
-        const colComplete = grid[col].every((num: any) => num === 'FREE' || calledSet.has(num))
-        if (colComplete) {
-          hasVertical = true
-          break
-        }
-      }
-      
-      // Check diagonal lines
-      const diagonal1 = [grid[0][0], grid[1][1], 'FREE', grid[3][3], grid[4][4]]
-      const diagonal2 = [grid[0][4], grid[1][3], 'FREE', grid[3][1], grid[4][0]]
-      const hasDiagonal1 = diagonal1.every(num => num === 'FREE' || calledSet.has(num))
-      const hasDiagonal2 = diagonal2.every(num => num === 'FREE' || calledSet.has(num))
-      
-      // Check full house
-      const allNumbers = grid.flat().filter(num => num !== 'FREE')
-      const hasFullHouse = allNumbers.every(num => calledSet.has(num))
-      
-      // Check if any winning pattern exists
-      let hasHorizontal = false
-      for (let row = 0; row < 5; row++) {
-        const rowComplete = grid.every(col => col[row] === 'FREE' || calledSet.has(col[row]))
-        if (rowComplete) {
-          hasHorizontal = true
-          break
-        }
-      }
-      
-      if (!hasHorizontal && !hasVertical && !hasDiagonal1 && !hasDiagonal2 && !hasFullHouse) {
-        const matchedNumbers = allNumbers.filter(num => calledSet.has(num))
-        throw new Error(`Invalid bingo! Player has ${matchedNumbers.length}/24 numbers called. Need horizontal line, vertical line, diagonal, or full house.`)
-      }
-
-      const entryFee = 10
-      const totalBets = state.players.length * entryFee
-      const platformFee = totalBets * 0.20
-      const prize = totalBets - platformFee
-
-      // Update player as winner
-      const { error: playerError } = await supabase
-        .from('players')
-        .update({ is_winner: true })
-        .eq('id', player.id)
-
-      if (playerError) throw playerError
-
-      // Update game status to finished
-      const { error: gameError } = await supabase
-        .from('games')
-        .update({ 
-          status: 'finished',
-          finished_at: new Date().toISOString()
+      } else {
+        // Player exists but doesn't have winning pattern
+        const patterns = await WinningVerificationService.getActiveWinningPatterns()
+        const markedPositions = result.markedPositions || []
+        
+        const patternStatus = patterns.map(pattern => {
+          const requiredPositions = pattern.pattern_positions
+          const markedInPattern = requiredPositions.filter(pos => markedPositions.includes(pos))
+          const completion = (markedInPattern.length / requiredPositions.length) * 100
+          
+          return {
+            name: pattern.name,
+            completion: Math.round(completion),
+            markedCount: markedInPattern.length,
+            totalCount: requiredPositions.length
+          }
         })
-        .eq('id', state.currentGame.id)
-
-      if (gameError) throw gameError
-
-      setState(prev => ({ 
-        ...prev, 
-        gameRunning: false,
-        currentGame: { ...prev.currentGame, status: 'finished' }
-      }))
-
-      return {
-        isWinner: true,
-        name: player.player_name,
-        cardNumber: player.selected_card_number,
-        entryFee,
-        totalBets,
-        prize,
-        platformFee
+        
+        const bestPattern = patternStatus.reduce((best, current) => 
+          current.completion > best.completion ? current : best, 
+          { completion: 0, name: 'None' }
+        )
+        
+        throw new Error(
+          `Card #${cardNumber} (${player.player_name}) is not a winner. ` +
+          `Best pattern: ${bestPattern.name} (${bestPattern.completion}% complete)`
+        )
       }
     } catch (error) {
       setState(prev => ({ ...prev, error: (error as Error).message }))
-      throw error // Re-throw to show in UI
+      return { isWinner: false, error: (error as Error).message }
     } finally {
       setState(prev => ({ ...prev, loading: false }))
     }
@@ -400,12 +339,23 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
         .insert({
           game_id: gameId,
           player_name: playerName,
-          selected_card_number: cardNumber
+          card_number: cardNumber
         })
         .select()
         .single()
 
       if (error) throw error
+      
+      // Initialize player's marked positions with free space
+      await supabase
+        .from('player_marked_numbers')
+        .insert({
+          game_id: gameId,
+          player_id: player.id,
+          card_number: cardNumber,
+          marked_positions: [12] // Center position is always marked
+        })
+        
       return { player, card: { cardNumber } }
     } catch (error) {
       throw error
@@ -413,25 +363,8 @@ export function RealtimeGameProvider({ children }: { children: ReactNode }) {
   }
 
   const callNumber = async (gameId: string) => {
-    if (!supabase) return
-    
-    const availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1)
-      .filter(num => !state.calledNumbers.includes(num))
-    
-    if (availableNumbers.length > 0) {
-      const nextNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)]
-      
-      try {
-        await supabase
-          .from('called_numbers')
-          .insert({
-            game_id: gameId,
-            number: nextNumber
-          })
-      } catch (error) {
-        console.error('Failed to call number:', error)
-      }
-    }
+    // This function is deprecated - automatic calling is now handled by AutomaticNumberCaller
+    console.warn('callNumber is deprecated - use AutomaticNumberCaller instead')
   }
 
   const value: GameContextType = {

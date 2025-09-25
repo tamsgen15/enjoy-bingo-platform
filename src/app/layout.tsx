@@ -2,13 +2,13 @@ import './globals.css'
 import { Inter } from 'next/font/google'
 import { RealtimeGameProvider } from '@/lib/RealtimeGameContext'
 import { AuthProvider } from '@/lib/UnifiedAuth'
-import Header from '@/components/Header'
+import ConditionalHeader from '@/components/ConditionalHeader'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Enjoy Bingo - Multiplayer Bingo Game',
-  description: 'Real-time multiplayer bingo with betting system',
+  title: 'Enjoy Bingo Platform - Multi-Tenant Gaming Platform',
+  description: 'Multi-tenant bingo gaming platform with subscription management',
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
@@ -26,7 +26,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <RealtimeGameProvider>
-            <Header />
+            <ConditionalHeader />
             {children}
           </RealtimeGameProvider>
         </AuthProvider>

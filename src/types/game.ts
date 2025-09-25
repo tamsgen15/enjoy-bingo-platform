@@ -13,7 +13,7 @@ export interface Player {
   id: string;
   game_id: string;
   player_name: string;
-  selected_card_number: number;
+  card_number: number;
   bet_amount: number;
   is_winner: boolean;
   joined_at: string;

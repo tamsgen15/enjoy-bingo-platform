@@ -1,11 +1,5 @@
-node_modules
-.next
+# Ignore files that might cause build issues
 .env.local
+.next/
+node_modules/
 *.log
-.DS_Store
-supabase
-printable_cards
-Asset
-*.py
-*.md
-*.sql

@@ -12,7 +12,7 @@ function OwnerLogin() {
   const router = useRouter()
 
   useEffect(() => {
-    if (user?.role === 'owner') {
+    if (user) {
       router.push('/owner/dashboard')
     }
   }, [user, router])

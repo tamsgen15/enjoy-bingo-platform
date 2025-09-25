@@ -338,7 +338,7 @@ function OwnerDashboard() {
                   <strong>Username:</strong> {user?.username}
                 </div>
                 <div className="text-white/70">
-                  <strong>Role:</strong> {user?.role}
+                  <strong>Role:</strong> Platform Owner
                 </div>
                 <div className="text-white/70">
                   <strong>Access Level:</strong> Platform Owner

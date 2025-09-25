@@ -23,11 +23,11 @@ export async function POST(
       return NextResponse.json({ error: 'Player not found' }, { status: 404 });
     }
 
-    // Get player's printed card
+    // Get player's bingo card
     const { data: card } = await supabaseAdmin
-      .from('printed_cards')
+      .from('bingo_cards')
       .select('*')
-      .eq('card_number', player.selected_card_number)
+      .eq('card_number', player.card_number)
       .single();
 
     if (!card) {

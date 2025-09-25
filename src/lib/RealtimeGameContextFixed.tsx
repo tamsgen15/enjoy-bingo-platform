@@ -43,7 +43,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined)
 export function RealtimeGameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GameState>(initialState)
   const [autoCallInterval, setAutoCallInterval] = useState<NodeJS.Timeout | null>(null)
-  const [voiceTTS] = useState(() => new OfflineAmharicTTS())
+  const [voiceTTS] = useState(() => OfflineAmharicTTS.getInstance())
   const [retryCount, setRetryCount] = useState(0)
   const [maxRetries] = useState(3)
 

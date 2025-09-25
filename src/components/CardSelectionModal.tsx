@@ -16,27 +16,36 @@ export default function CardSelectionModal({ gameId, onClose, onAssign }: CardSe
   const [cardData, setCardData] = useState<any>(null)
   
   // Get taken cards from existing players
-  const takenCards = players.map(player => player.selected_card_number)
+  const takenCards = players.map(player => player.card_number).filter(Boolean)
 
   // Fetch real bingo card from database
   useEffect(() => {
     if (selectedCard) {
       const fetchCard = async () => {
-        const { supabase } = await import('@/lib/supabase')
-        const { data } = await supabase
-          .from('bingo_cards')
-          .select('*')
-          .eq('card_number', selectedCard)
-          .single()
-        
-        if (data) {
-          setCardData({
-            b: data.b_column,
-            i: data.i_column,
-            n: [...data.n_column.slice(0, 2), 'FREE', ...data.n_column.slice(2)],
-            g: data.g_column,
-            o: data.o_column
-          })
+        try {
+          const { supabase } = await import('@/lib/supabase')
+          const { data, error } = await supabase
+            .from('bingo_cards')
+            .select('*')
+            .eq('card_number', selectedCard)
+            .single()
+          
+          if (error) {
+            console.error('Error fetching card:', error)
+            return
+          }
+          
+          if (data) {
+            setCardData({
+              b: data.b_column,
+              i: data.i_column,
+              n: [...data.n_column.slice(0, 2), 'FREE', ...data.n_column.slice(2)],
+              g: data.g_column,
+              o: data.o_column
+            })
+          }
+        } catch (err) {
+          console.error('Failed to fetch card:', err)
         }
       }
       fetchCard()
@@ -86,7 +95,7 @@ export default function CardSelectionModal({ gameId, onClose, onAssign }: CardSe
                     key={cardNum}
                     onClick={() => !isTaken && setSelectedCard(cardNum)}
                     disabled={isTaken}
-                    className={`w-8 h-6 text-xs font-bold border border-gray-300 rounded mx-1 transition-all flex items-center justify-center ${
+                    className={`w-8 h-6 text-xs font-bold border border-gray-300 rounded transition-all flex items-center justify-center ${
                       isSelected
                         ? 'bg-blue-500 text-white border-blue-600'
                         : !isTaken
@@ -103,7 +112,7 @@ export default function CardSelectionModal({ gameId, onClose, onAssign }: CardSe
             {selectedCard && cardData && (
               <div>
                 <label className="block text-sm font-medium mb-2 text-white">Card #{selectedCard} Preview</label>
-                <div className="border rounded p-2 bg-gray-50 w-fit">
+                <div className="border rounded p-2 bg-white/90 w-fit">
                   <div className="grid grid-cols-5 gap-0.5 text-xs">
                     <div className="font-bold text-center bg-sky-400 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">B</div>
                     <div className="font-bold text-center bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">I</div>
@@ -113,7 +122,7 @@ export default function CardSelectionModal({ gameId, onClose, onAssign }: CardSe
                     
                     {[0,1,2,3,4].map(row => 
                       [cardData.b[row], cardData.i[row], cardData.n[row], cardData.g[row], cardData.o[row]].map((num, col) => (
-                        <div key={`${row}-${col}`} className={`text-center w-6 h-6 border flex items-center justify-center text-xs ${
+                        <div key={`${row}-${col}`} className={`text-center w-6 h-6 border border-gray-300 flex items-center justify-center text-xs ${
                           num === 'FREE' ? 'bg-yellow-300 font-bold' : 'bg-gray-100'
                         }`}>
                           {num === 'FREE' ? '★' : num}

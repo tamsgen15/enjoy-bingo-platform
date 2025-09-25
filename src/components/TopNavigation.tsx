@@ -48,7 +48,7 @@ export default function TopNavigation() {
                       : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <item.icon className="h-4 w-4 mr-2" />
+                  <item.icon className="h-4 w-4 mr-2" {...({} as any)} />
                   {item.label}
                 </Link>
               ))}
@@ -66,7 +66,7 @@ export default function TopNavigation() {
                       : 'text-white/70'
                   }`}
                 >
-                  <item.icon className="h-3 w-3" />
+                  <item.icon className="h-3 w-3" {...({} as any)} />
                 </Link>
               ))}
             </nav>
