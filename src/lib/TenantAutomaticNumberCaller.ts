@@ -130,7 +130,7 @@ class TenantAutomaticNumberCaller {
    * Find active session for tenant
    */
   private findTenantSession(tenantId: string): TenantGameSession | undefined {
-    for (const [key, session] of this.tenantSessions) {
+    for (const session of Array.from(this.tenantSessions.values())) {
       if (session.tenantId === tenantId && session.isActive) {
         return session
       }
