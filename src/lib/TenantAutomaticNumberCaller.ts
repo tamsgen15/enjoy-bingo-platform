@@ -183,7 +183,11 @@ class TenantAutomaticNumberCaller {
       const activeTenants = this.getActiveTenants()
       const tenantId = activeTenants.length > 0 ? activeTenants[0] : undefined
       
-      // Play single letter+number audio (no duplicates)
+      // Play letter first, then number (single sequence)
+      if (letter) {
+        await tenantAudioManager.playLetter(letter, tenantId)
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
       await tenantAudioManager.playNumber(number, tenantId)
     } catch (error) {
       console.log('Audio manager not available:', error)

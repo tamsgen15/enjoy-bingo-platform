@@ -81,11 +81,8 @@ class TenantAudioManager {
     }
 
     try {
-      const letter = this.getLetterForNumber(number)
-      
-      // Play letter first, then number (already lowercase)
+      // Play only the number (no letter to avoid duplicates)
       await this.playSequence([
-        `/audio/amharic/${letter}.mp3`,
         `/audio/amharic/${number}.mp3`
       ])
       
@@ -97,7 +94,7 @@ class TenantAudioManager {
   }
 
   /**
-   * Play letter audio only
+   * Play letter audio only (single call)
    */
   async playLetter(letter: string, forTenant?: string): Promise<void> {
     // Only play if this is for our tenant or no tenant specified
@@ -111,7 +108,24 @@ class TenantAudioManager {
     }
 
     try {
-      await this.playSequence([`/audio/amharic/${letter}.mp3`])
+      const audio = new Audio(`/audio/amharic/${letter}.mp3`)
+      audio.volume = 0.7
+      this.currentAudio = audio
+      this.isPlaying = true
+      
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => {
+          this.isPlaying = false
+          this.currentAudio = null
+          resolve()
+        }
+        audio.onerror = () => {
+          this.isPlaying = false
+          this.currentAudio = null
+          reject(new Error('Audio failed'))
+        }
+        audio.play().catch(reject)
+      })
     } catch (error) {
       console.log('Letter audio play failed:', error)
       this.isPlaying = false
