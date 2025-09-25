@@ -11,6 +11,15 @@ const nextConfig = {
       tls: false,
     }
     return config
+  },
+  // Ensure audio files are included in build
+  async rewrites() {
+    return [
+      {
+        source: '/audio/:path*',
+        destination: '/audio/:path*',
+      },
+    ]
   }
 }
 

@@ -30,8 +30,8 @@ class TenantAudioManager {
   async preloadAudio(): Promise<void> {
     console.log('🎵 Preloading Amharic audio files...')
     
-    // Preload letters
-    const letters = ['B', 'I', 'N', 'G', 'O']
+    // Preload letters (lowercase filenames)
+    const letters = ['b', 'i', 'n', 'g', 'o']
     for (const letter of letters) {
       try {
         const audio = new Audio(`/audio/amharic/${letter}.mp3`)
@@ -83,9 +83,9 @@ class TenantAudioManager {
     try {
       const letter = this.getLetterForNumber(number)
       
-      // Play letter first, then number
+      // Play letter first, then number (lowercase filenames)
       await this.playSequence([
-        `/audio/amharic/${letter}.mp3`,
+        `/audio/amharic/${letter.toLowerCase()}.mp3`,
         `/audio/amharic/${number}.mp3`
       ])
       
@@ -111,7 +111,7 @@ class TenantAudioManager {
     }
 
     try {
-      await this.playSequence([`/audio/amharic/${letter}.mp3`])
+      await this.playSequence([`/audio/amharic/${letter.toLowerCase()}.mp3`])
     } catch (error) {
       console.log('Letter audio play failed:', error)
       this.isPlaying = false
