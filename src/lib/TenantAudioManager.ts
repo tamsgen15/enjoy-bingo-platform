@@ -94,40 +94,53 @@ class TenantAudioManager {
   }
 
   /**
-   * Play letter audio only (single call)
+   * Play letter+number sequence (singleton - prevents all duplicates)
    */
-  async playLetter(letter: string, forTenant?: string): Promise<void> {
+  async playLetterNumberSequence(letter: string, number: number, forTenant?: string): Promise<void> {
     // Only play if this is for our tenant or no tenant specified
     if (forTenant && this.tenantId && forTenant !== this.tenantId) {
       return
     }
 
-    // Prevent multiple simultaneous plays
+    // Prevent multiple simultaneous plays (singleton protection)
     if (this.isPlaying) {
+      console.log('🔇 Audio already playing, skipping duplicate call')
       return
     }
 
     try {
-      const audio = new Audio(`/audio/amharic/${letter}.mp3`)
-      audio.volume = 0.7
-      this.currentAudio = audio
       this.isPlaying = true
       
+      // Play letter first
+      if (letter) {
+        const letterAudio = new Audio(`/audio/amharic/${letter.toLowerCase()}.mp3`)
+        letterAudio.volume = 0.7
+        this.currentAudio = letterAudio
+        
+        await new Promise<void>((resolve, reject) => {
+          letterAudio.onended = () => resolve()
+          letterAudio.onerror = () => reject(new Error('Letter audio failed'))
+          letterAudio.play().catch(reject)
+        })
+        
+        // Small delay between letter and number
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+      
+      // Play number
+      const numberAudio = new Audio(`/audio/amharic/${number}.mp3`)
+      numberAudio.volume = 0.7
+      this.currentAudio = numberAudio
+      
       await new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          this.isPlaying = false
-          this.currentAudio = null
-          resolve()
-        }
-        audio.onerror = () => {
-          this.isPlaying = false
-          this.currentAudio = null
-          reject(new Error('Audio failed'))
-        }
-        audio.play().catch(reject)
+        numberAudio.onended = () => resolve()
+        numberAudio.onerror = () => reject(new Error('Number audio failed'))
+        numberAudio.play().catch(reject)
       })
+      
     } catch (error) {
-      console.log('Letter audio play failed:', error)
+      console.log('Letter+Number sequence failed:', error)
+    } finally {
       this.isPlaying = false
       this.currentAudio = null
     }
