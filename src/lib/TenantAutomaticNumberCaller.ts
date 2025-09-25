@@ -149,8 +149,8 @@ class TenantAutomaticNumberCaller {
         session.callCount++
         console.log(`📢 Tenant ${session.tenantId.slice(0, 8)}... called: ${result.letter}${result.number} (${session.callCount})`)
         
-        // Play audio for the called number
-        this.playNumberAudio(result.number)
+        // Play audio for the called number with letter
+        this.playNumberAudio(result.number, result.letter)
         
       } else if (result.error?.includes('All numbers called') || result.error?.includes('Game not found')) {
         console.log(`🏁 Tenant ${session.tenantId.slice(0, 8)}... game completed`)
@@ -175,13 +175,20 @@ class TenantAutomaticNumberCaller {
   }
 
   /**
-   * Play audio for called number using singleton manager
+   * Play audio for called number with letter using singleton manager
    */
-  private async playNumberAudio(number: number): Promise<void> {
+  private async playNumberAudio(number: number, letter?: string): Promise<void> {
     try {
       const { tenantAudioManager } = await import('./TenantAudioManager')
       const activeTenants = this.getActiveTenants()
       const tenantId = activeTenants.length > 0 ? activeTenants[0] : undefined
+      
+      // Play letter first, then number
+      if (letter) {
+        await tenantAudioManager.playLetter(letter, tenantId)
+        // Small delay between letter and number
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
       await tenantAudioManager.playNumber(number, tenantId)
     } catch (error) {
       console.log('Audio manager not available:', error)

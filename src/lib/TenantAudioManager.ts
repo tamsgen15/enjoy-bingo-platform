@@ -97,6 +97,29 @@ class TenantAudioManager {
   }
 
   /**
+   * Play letter audio only
+   */
+  async playLetter(letter: string, forTenant?: string): Promise<void> {
+    // Only play if this is for our tenant or no tenant specified
+    if (forTenant && this.tenantId && forTenant !== this.tenantId) {
+      return
+    }
+
+    // Prevent multiple simultaneous plays
+    if (this.isPlaying) {
+      return
+    }
+
+    try {
+      await this.playSequence([`/audio/amharic/${letter}.mp3`])
+    } catch (error) {
+      console.log('Letter audio play failed:', error)
+      this.isPlaying = false
+      this.currentAudio = null
+    }
+  }
+
+  /**
    * Get BINGO letter for number
    */
   private getLetterForNumber(number: number): string {
