@@ -149,8 +149,8 @@ class TenantAutomaticNumberCaller {
         session.callCount++
         console.log(`📢 Tenant ${session.tenantId.slice(0, 8)}... called: ${result.letter}${result.number} (${session.callCount})`)
         
-        // Play audio for the called number with letter
-        this.playNumberAudio(result.number, result.letter)
+        // Play audio for the called number with letter (ensure lowercase)
+        this.playNumberAudio(result.number, result.letter?.toLowerCase())
         
       } else if (result.error?.includes('All numbers called') || result.error?.includes('Game not found')) {
         console.log(`🏁 Tenant ${session.tenantId.slice(0, 8)}... game completed`)

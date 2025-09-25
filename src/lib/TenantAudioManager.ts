@@ -83,9 +83,9 @@ class TenantAudioManager {
     try {
       const letter = this.getLetterForNumber(number)
       
-      // Play letter first, then number (lowercase filenames)
+      // Play letter first, then number (already lowercase)
       await this.playSequence([
-        `/audio/amharic/${letter.toLowerCase()}.mp3`,
+        `/audio/amharic/${letter}.mp3`,
         `/audio/amharic/${number}.mp3`
       ])
       
@@ -111,7 +111,7 @@ class TenantAudioManager {
     }
 
     try {
-      await this.playSequence([`/audio/amharic/${letter.toLowerCase()}.mp3`])
+      await this.playSequence([`/audio/amharic/${letter}.mp3`])
     } catch (error) {
       console.log('Letter audio play failed:', error)
       this.isPlaying = false
@@ -120,14 +120,14 @@ class TenantAudioManager {
   }
 
   /**
-   * Get BINGO letter for number
+   * Get BINGO letter for number (lowercase for file paths)
    */
   private getLetterForNumber(number: number): string {
-    if (number <= 15) return 'B'
-    if (number <= 30) return 'I'
-    if (number <= 45) return 'N'
-    if (number <= 60) return 'G'
-    return 'O'
+    if (number <= 15) return 'b'
+    if (number <= 30) return 'i'
+    if (number <= 45) return 'n'
+    if (number <= 60) return 'g'
+    return 'o'
   }
 
   /**
