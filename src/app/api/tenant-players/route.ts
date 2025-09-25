@@ -6,10 +6,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
-    const gameId = request.nextUrl.searchParams.get('gameId');
-    const tenantId = request.nextUrl.searchParams.get('tenantId');
+    const { searchParams } = new URL(request.url);
+    const gameId = searchParams.get('gameId');
+    const tenantId = searchParams.get('tenantId');
 
     if (!gameId || !tenantId) {
       return NextResponse.json({ error: 'Game ID and Tenant ID required' }, { status: 400 });
