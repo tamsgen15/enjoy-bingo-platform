@@ -12,12 +12,13 @@ interface TenantGameSession {
   isActive: boolean
   isPaused: boolean
   callCount: number
+  callInterval: number
 }
 
 class TenantAutomaticNumberCaller {
   private static instance: TenantAutomaticNumberCaller
   private tenantSessions: Map<string, TenantGameSession> = new Map()
-  private readonly CALL_INTERVAL = 6000 // 6 seconds
+  private readonly DEFAULT_CALL_INTERVAL = 6000 // 6 seconds
 
   static getInstance(): TenantAutomaticNumberCaller {
     if (!TenantAutomaticNumberCaller.instance) {
@@ -29,13 +30,14 @@ class TenantAutomaticNumberCaller {
   /**
    * Start automatic calling for a specific tenant game
    */
-  startTenantGame(gameId: string, tenantId: string): void {
+  startTenantGame(gameId: string, tenantId: string, callInterval?: number): void {
     const sessionKey = `${tenantId}-${gameId}`
     
     // Stop existing session for this tenant
     this.stopTenantGame(tenantId)
     
-    console.log(`🎯 Starting tenant caller: ${tenantId.slice(0, 8)}... game: ${gameId.slice(0, 8)}...`)
+    const interval = (callInterval || 6) * 1000 // Convert seconds to milliseconds
+    console.log(`🎯 Starting tenant caller: ${tenantId.slice(0, 8)}... game: ${gameId.slice(0, 8)}... interval: ${interval}ms`)
     
     const session: TenantGameSession = {
       gameId,
@@ -43,14 +45,15 @@ class TenantAutomaticNumberCaller {
       intervalId: null,
       isActive: true,
       isPaused: false,
-      callCount: 0
+      callCount: 0,
+      callInterval: interval
     }
     
     session.intervalId = setInterval(async () => {
       if (!session.isPaused && session.isActive) {
         await this.callNextNumberForTenant(session)
       }
-    }, this.CALL_INTERVAL)
+    }, interval)
     
     this.tenantSessions.set(sessionKey, session)
   }
@@ -105,6 +108,31 @@ class TenantAutomaticNumberCaller {
   }
 
   /**
+   * Update call interval for active tenant game
+   */
+  updateCallInterval(tenantId: string, newIntervalSeconds: number): void {
+    const session = this.findTenantSession(tenantId)
+    if (session && session.isActive) {
+      const newInterval = newIntervalSeconds * 1000
+      
+      // Clear old interval
+      if (session.intervalId) {
+        clearInterval(session.intervalId)
+      }
+      
+      // Set new interval
+      session.callInterval = newInterval
+      session.intervalId = setInterval(async () => {
+        if (!session.isPaused && session.isActive) {
+          await this.callNextNumberForTenant(session)
+        }
+      }, newInterval)
+      
+      console.log(`⏱️ Updated tenant ${tenantId.slice(0, 8)}... interval to ${newIntervalSeconds}s`)
+    }
+  }
+
+  /**
    * Get tenant session status
    */
   getTenantStatus(tenantId: string): {
@@ -112,17 +140,19 @@ class TenantAutomaticNumberCaller {
     paused: boolean
     gameId?: string
     callCount: number
+    callInterval: number
   } {
     const session = this.findTenantSession(tenantId)
     if (!session) {
-      return { active: false, paused: false, callCount: 0 }
+      return { active: false, paused: false, callCount: 0, callInterval: 6 }
     }
     
     return {
       active: session.isActive,
       paused: session.isPaused,
       gameId: session.gameId,
-      callCount: session.callCount
+      callCount: session.callCount,
+      callInterval: session.callInterval / 1000
     }
   }
 

@@ -15,6 +15,7 @@ export interface GameState {
   entry_fee: number
   platform_fee_percent: number
   tenant_id?: string
+  call_interval_seconds?: number
 }
 
 export interface Player {

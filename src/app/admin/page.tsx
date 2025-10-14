@@ -190,6 +190,7 @@ function AdminDashboard() {
   const [realtimeCallStatus, setRealtimeCallStatus] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [tenantName, setTenantName] = useState<string>('')
+  const [callInterval, setCallInterval] = useState<number>(6)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const scrollPreview = (direction: 'left' | 'right') => {
@@ -313,7 +314,9 @@ function AdminDashboard() {
         }
         initAudio()
         
-        tenantAutomaticNumberCaller.startTenantGame(currentGame.id, tenantId)
+        const interval = currentGame.call_interval_seconds || callInterval
+        tenantAutomaticNumberCaller.startTenantGame(currentGame.id, tenantId, interval)
+        setCallInterval(interval)
       }
     } else if (currentGame?.status === 'paused') {
       console.log('⏸️ Admin: Pausing tenant automatic caller')
@@ -578,27 +581,21 @@ function AdminDashboard() {
     try {
       const cardsToAssign = multiSelectMode ? selectedCards : (selectedCard ? [selectedCard] : [])
       
-      for (const cardNum of cardsToAssign) {
-        // Add player with session tracking
-        const deviceId = navigator.userAgent + '_' + Date.now()
-        const { data, error } = await supabase.rpc('add_player_tenant_isolated', {
-          p_game_id: currentGame.id,
-          p_tenant_id: tenantId,
-          p_player_name: playerName.trim(),
-          p_card_number: cardNum,
-          p_session_id: sessionId,
-          p_device_id: deviceId
-        })
-        
-        const result = {
-          success: !error,
-          error: error?.message
-        }
-        
-        if (!result.success) {
-          alert(`Failed to assign card ${cardNum}: ` + (result.error || 'Unknown error'))
-          break
-        }
+      // OPTIMIZED: Bulk insert all players at once
+      const players = cardsToAssign.map(cardNum => ({
+        player_name: playerName.trim(),
+        card_number: cardNum
+      }))
+      
+      const { data, error } = await supabase.rpc('bulk_add_players_tenant', {
+        p_game_id: currentGame.id,
+        p_tenant_id: tenantId,
+        p_players: players
+      })
+      
+      if (error || !data?.success) {
+        alert('Failed to assign cards: ' + (error?.message || data?.error || 'Unknown error'))
+        return
       }
       
       setPlayerName('')
@@ -949,6 +946,42 @@ function AdminDashboard() {
                     )}
                     
 
+                    
+                    <div className="space-y-2">
+                      <Label className="text-white text-xs">⏱️ Call Interval (seconds)</Label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={callInterval}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 6
+                            setCallInterval(Math.max(0, Math.min(10, val)))
+                          }}
+                          className="bg-white/20 border-white/30 text-white text-sm h-8"
+                        />
+                        <Button
+                          onClick={async () => {
+                            if (currentGame?.id) {
+                              await supabase
+                                .from('games')
+                                .update({ call_interval_seconds: callInterval })
+                                .eq('id', currentGame.id)
+                              
+                              tenantAutomaticNumberCaller.updateCallInterval(tenantId, callInterval)
+                              setCurrentGame(prev => prev ? {...prev, call_interval_seconds: callInterval} : null)
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 px-3"
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      <div className="text-white/60 text-xs">
+                        0 = instant, 10 = slowest
+                      </div>
+                    </div>
                     
                     <Button
                       onClick={() => setShowPlatformFeeModal(true)}
